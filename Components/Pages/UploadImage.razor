@@ -1,0 +1,129 @@
+﻿@page "/serversignalr"
+@using Azure
+@using Azure.AI.Vision.ImageAnalysis
+@using System.Net
+@inject IWebHostEnvironment env
+@* @inject BlobServiceClient blobClient *@
+@using System
+@inject IConfiguration Configuration
+@rendermode InteractiveServer
+
+<div>
+    <h2 class="display-4">Interactive Server Upload</h2>
+    <p>This render mode is also known as "Blazor Server with SignalR".</p>
+</div>
+
+@if (Message.Length > 0)
+{
+    <p class="alert alert-secondary" role="alert">@Message</p>
+}
+
+<EditForm Model="@Ticket" method="post" OnValidSubmit="@OnSubmit" enctype="multipart/form-data">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
+    <button class="btn btn-primary" type="submit">Submit</button>
+</EditForm>
+@if (analysisResult != null)
+{
+    <div>
+        <h4>Analysis Result:</h4>
+        <pre>@analysisResult</pre>
+    </div>
+}
+
+@code {
+    private ServerSignalRTicket Ticket { get; set; } = new();
+    private long maxFileSize = 5120000; 
+    private string Message { get; set; } = String.Empty;
+    private string analysisResult = "";
+
+    private void SetFile(InputFileChangeEventArgs e)
+    {
+        Ticket.Attachments = e.GetMultipleFiles();
+    }
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            foreach (var file in Ticket.Attachments)
+            {
+                string safeFileName = WebUtility.HtmlEncode(file.Name);
+
+                // Save file locally
+                var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+                long fileSize = fs.Length;
+                Console.WriteLine(fileSize);
+                fs.Position = 0;
+                AnalyzeImage(fs);
+                // Upload file to blob storage
+                // var rand = new Random().Next(10000);
+                // var docsContainer = blobClient.GetBlobContainerClient("tickets");
+                // await docsContainer.UploadBlobAsync(
+                //     $"{rand}_{safeFileName}",
+                //         file.OpenReadStream(maxFileSize));
+
+                // TODO: Save title, description and image nanme/reference to a database
+            }
+
+            Message = "File uploaded!";
+        }
+        catch (Exception e)
+        {
+            Message = "Error: " + e.Message;
+        }
+    }
+
+    private void AnalyzeImage(FileStream imageFileStream)
+    {
+        string endpoint = Configuration["AzureVisionEndpoint"];
+        string key = Configuration["AzureVisionKey"];
+
+        ImageAnalysisClient client = new ImageAnalysisClient(
+            new Uri(endpoint),
+            new AzureKeyCredential(key));
+
+        // using FileStream stream = new FileStream("pruebavision.png", FileMode.Open);
+        FileStream stream = imageFileStream;
+        BinaryData imageData = BinaryData.FromStream(stream);
+
+        VisualFeatures visualFeatures =
+            VisualFeatures.Caption |
+            VisualFeatures.Read;
+
+        ImageAnalysisOptions options = new ImageAnalysisOptions
+            {
+                GenderNeutralCaption = true,
+                Language = "en",
+            };
+
+        ImageAnalysisResult result = client.Analyze(
+            imageData,
+            visualFeatures,
+            options);
+
+
+        foreach (DetectedTextBlock block in result.Read.Blocks)
+        {
+            foreach (DetectedTextLine line in block.Lines)
+            {
+                foreach (DetectedTextWord word in line.Words)
+                {
+                    analysisResult += $"Word: '{word.Text}'\n";
+                }
+
+            }
+        }
+        Console.WriteLine(analysisResult);
+        // CheckForKeywords(analysisResult);
+    }
+
+    private class ServerSignalRTicket
+    {
+
+        public IReadOnlyList<IBrowserFile> Attachments { get; set; }
+    }
+}
