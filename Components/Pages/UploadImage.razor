@@ -10,7 +10,6 @@
 
 <div>
     <h2 class="display-4">Interactive Server Upload</h2>
-    <p>This render mode is also known as "Blazor Server with SignalR".</p>
 </div>
 
 @if (Message.Length > 0)
@@ -24,11 +23,15 @@
     <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
     <button class="btn btn-primary" type="submit">Submit</button>
 </EditForm>
-@if (analysisResult != null)
+
+@if (succesfulWords == 4 && CompareWithSystemDate())
 {
     <div>
-        <h4>Analysis Result:</h4>
-        <pre>@analysisResult</pre>
+        <h1>Validado exitosamente</h1>
+    </div>
+}else{
+    <div>
+        <h1>No se pudo validar exitosamente</h1>
     </div>
 }
 
@@ -36,7 +39,11 @@
     private ServerSignalRTicket Ticket { get; set; } = new();
     private long maxFileSize = 5120000; 
     private string Message { get; set; } = String.Empty;
-    private string analysisResult = "";
+    private List<string> analysisResult = new List<string>();
+    private int succesfulWords = 0;
+    private string extractedDate;
+    private int iii = 0;
+
 
     private void SetFile(InputFileChangeEventArgs e)
     {
@@ -47,7 +54,7 @@
     {
         try
         {
-            foreach (var file in Ticket.Attachments)
+            foreach (var file in    Ticket.Attachments)
             {
                 string safeFileName = WebUtility.HtmlEncode(file.Name);
 
@@ -59,14 +66,10 @@
                 Console.WriteLine(fileSize);
                 fs.Position = 0;
                 AnalyzeImage(fs);
-                // Upload file to blob storage
-                // var rand = new Random().Next(10000);
-                // var docsContainer = blobClient.GetBlobContainerClient("tickets");
-                // await docsContainer.UploadBlobAsync(
-                //     $"{rand}_{safeFileName}",
-                //         file.OpenReadStream(maxFileSize));
+                CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
+                fs.Close();
+                File.Delete(path);
 
-                // TODO: Save title, description and image nanme/reference to a database
             }
 
             Message = "File uploaded!";
@@ -112,14 +115,124 @@
             {
                 foreach (DetectedTextWord word in line.Words)
                 {
-                    analysisResult += $"Word: '{word.Text}'\n";
+                    analysisResult.Add(word.Text);
                 }
 
             }
         }
-        Console.WriteLine(analysisResult);
-        // CheckForKeywords(analysisResult);
+        foreach (string word in analysisResult)
+        {
+            Console.WriteLine($"{iii}: '{word}'");
+            iii++;
+        }
+        FetchData();
+
+
     }
+
+    private void CompareWithFixedData(string[] fixedData)
+    {
+        List<bool> comparisonResults = new List<bool>();
+
+
+        for (int i = 0; i < fixedData.Length && i < analysisResult.Count; i++)
+        {
+            comparisonResults.Add(fixedData[i] == analysisResult[i]);
+            succesfulWords++;
+        }
+
+    }
+
+    private bool CompareWithSystemDate()
+    {
+        if (analysisResult.Count == 0)
+        {
+            throw new InvalidOperationException("El elemento está vacío");
+        }
+
+        string lastElement = "07/10/2024"; //analysisResult.Last();
+        if (DateTime.TryParseExact(lastElement, "MM/dd/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
+        {
+            DateTime systemDate = DateTime.Now.Date;
+            return extractedDate==systemDate;
+        }
+        else
+        {
+            throw new FormatException("The last element is not in a valid date format.");
+        }
+    }
+
+    //private string connectionString = "Host=192.168.137.22:5432;Username=postgres;Password=1234;Database=prueba18";
+
+    private void FetchData()
+    {
+        string pattern = @"\b\d{2}/\d{2}/\d{4}\b";
+        const int numElementsToStore = 3;
+
+        /*using (var connection = new NpgsqlConnection(connectionString))
+        {
+            connection.Open();*/
+
+            for (int i = 0; i < analysisResult.Count; i++)
+            {
+                string str = analysisResult[i];
+                MatchCollection matches = Regex.Matches(str, pattern);
+
+                if (matches.Count > 0)
+                {
+                    // Verificar el elemento anterior y el siguiente
+                    bool previousIsDigit = i > 0 && IsDigit(analysisResult[i - 1]);
+                    bool nextIsDigit = i < analysisResult.Count - 1 && IsDigit(analysisResult[i + 1]);
+
+                    if (previousIsDigit && nextIsDigit)
+                    {
+                        // Almacenar el match y los siguientes elementos en la base de datos
+                        List<string> elementsToStore = new List<string>();
+                        elementsToStore.Add(analysisResult[i - 1]);
+                        elementsToStore.Add(str); // Agregar el match actual
+
+                        // Agregar los siguientes cinco elementos si existen
+                        for (int j = 1; j <= numElementsToStore - 1 && (i + j) < analysisResult.Count; j++)
+                        {
+                            elementsToStore.Add(analysisResult[i + j]);
+                        }
+
+
+                        Console.WriteLine("Elementos a almacenar:");
+                        foreach (var element in elementsToStore)
+                        {
+
+                            Console.WriteLine(element);
+                            /*string insertQuery = "INSERT INTO imgData (idimg,fecha,corte,monto) VALUES (@element)";
+                            using (var cmd = new NpgsqlCommand(insertQuery, connection))
+                            {
+                                cmd.Parameters.AddWithValue("element", element);
+                                cmd.ExecuteNonQuery();
+                            }*/
+                        }
+                        Console.WriteLine("-----");
+                    }
+                }
+
+            }
+        //}
+    }
+
+    private bool IsDigit(string str)
+    {
+        if (str == null) return false;
+
+        foreach (char c in str)
+        {
+            if (!char.IsDigit(c))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+
 
     private class ServerSignalRTicket
     {
