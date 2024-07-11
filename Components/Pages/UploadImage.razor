@@ -7,9 +7,11 @@
 @using System
 @inject IConfiguration Configuration
 @rendermode InteractiveServer
+@using PruebaAnalisisDeImagen.Data
 
 <div>
-    <h2 class="display-4">Interactive Server Upload</h2>
+    <h2 class="display-4">Registro de cobros interbancarios</h2>
+    Carga el archivo de registro.
 </div>
 
 @if (Message.Length > 0)
@@ -21,18 +23,23 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
     <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
-    <button class="btn btn-primary" type="submit">Submit</button>
+    <button class="btn btn-primary" type="submit">Confirmar</button>
 </EditForm>
-
-@if (succesfulWords == 4 && CompareWithSystemDate())
+@if (imageUploaded)
 {
-    <div>
-        <h1>Validado exitosamente</h1>
-    </div>
-}else{
-    <div>
-        <h1>No se pudo validar exitosamente</h1>
-    </div>
+    @if (succesfulWords == 4 && CompareWithSystemDate())
+    {
+        <div>
+            <h1>Validado exitosamente</h1>
+        </div>
+    }
+    else
+    {
+        <div>
+            <h1>No se pudo validar exitosamente</h1>
+        </div>
+    }
+
 }
 
 @code {
@@ -40,10 +47,11 @@
     private long maxFileSize = 5120000; 
     private string Message { get; set; } = String.Empty;
     private List<string> analysisResult = new List<string>();
+    private List<string> elementsToStore = new List<string>();
     private int succesfulWords = 0;
     private string extractedDate;
     private int iii = 0;
-
+    private bool imageUploaded = false;
 
     private void SetFile(InputFileChangeEventArgs e)
     {
@@ -67,6 +75,7 @@
                 fs.Position = 0;
                 AnalyzeImage(fs);
                 CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
+                imageUploaded = true;
                 fs.Close();
                 File.Delete(path);
 
@@ -150,8 +159,9 @@
             throw new InvalidOperationException("El elemento está vacío");
         }
 
-        string lastElement = "07/10/2024"; //analysisResult.Last();
-        if (DateTime.TryParseExact(lastElement, "MM/dd/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
+        string imageDate = "10/07/2024"; //imagedto.fecha; //"07/10/2024"
+        Console.WriteLine(imagedto.fecha);
+        if (DateTime.TryParseExact(imageDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
         {
             DateTime systemDate = DateTime.Now.Date;
             return extractedDate==systemDate;
@@ -162,64 +172,95 @@
         }
     }
 
-    //private string connectionString = "Host=192.168.137.22:5432;Username=postgres;Password=1234;Database=prueba18";
+    private string connectionString = "Host=192.168.137.22:5432;Username=postgres;Password=1234;Database=prueba18";
+    private imageDto imagedto = new imageDto();
 
     private void FetchData()
     {
         string pattern = @"\b\d{2}/\d{2}/\d{4}\b";
+        string processPattern = @"S[CP]I[1-3]";
         const int numElementsToStore = 3;
+        bool processFound = false;
 
-        /*using (var connection = new NpgsqlConnection(connectionString))
+
+        for (int i = 0; i < analysisResult.Count; i++)
         {
-            connection.Open();*/
+            string str = analysisResult[i];
+            MatchCollection matches = Regex.Matches(str, pattern);
+            MatchCollection processMatches = Regex.Matches(str, processPattern);
 
-            for (int i = 0; i < analysisResult.Count; i++)
+            if (processMatches.Count > 0 && !processFound)
             {
-                string str = analysisResult[i];
-                MatchCollection matches = Regex.Matches(str, pattern);
+                elementsToStore.Add(str);
+                Console.WriteLine("aaaaaaaaaa" + str);
+                processFound = true;
 
-                if (matches.Count > 0)
+            }
+
+            if (matches.Count > 0)
+            {
+                // Verificar el elemento anterior y el siguiente
+                bool previousIsDigit = i > 0 && IsDigit(analysisResult[i - 1]);
+                bool nextIsDigit = i < analysisResult.Count - 1 && IsDigit(analysisResult[i + 1]);
+
+                if (previousIsDigit && nextIsDigit)
                 {
-                    // Verificar el elemento anterior y el siguiente
-                    bool previousIsDigit = i > 0 && IsDigit(analysisResult[i - 1]);
-                    bool nextIsDigit = i < analysisResult.Count - 1 && IsDigit(analysisResult[i + 1]);
+                    // Almacenar el match y los siguientes elementos en la base de datos
+                    //List<string> elementsToStore = new List<string>();
+                    elementsToStore.Add(analysisResult[i - 1]);
+                    elementsToStore.Add(str); // Agregar el match actual
 
-                    if (previousIsDigit && nextIsDigit)
+                    // Agregar los siguientes cinco elementos si existen
+                    for (int j = 1; j <= numElementsToStore - 1 && (i + j) < analysisResult.Count; j++)
                     {
-                        // Almacenar el match y los siguientes elementos en la base de datos
-                        List<string> elementsToStore = new List<string>();
-                        elementsToStore.Add(analysisResult[i - 1]);
-                        elementsToStore.Add(str); // Agregar el match actual
-
-                        // Agregar los siguientes cinco elementos si existen
-                        for (int j = 1; j <= numElementsToStore - 1 && (i + j) < analysisResult.Count; j++)
-                        {
-                            elementsToStore.Add(analysisResult[i + j]);
-                        }
-
-
-                        Console.WriteLine("Elementos a almacenar:");
-                        foreach (var element in elementsToStore)
-                        {
-
-                            Console.WriteLine(element);
-                            /*string insertQuery = "INSERT INTO imgData (idimg,fecha,corte,monto) VALUES (@element)";
-                            using (var cmd = new NpgsqlCommand(insertQuery, connection))
-                            {
-                                cmd.Parameters.AddWithValue("element", element);
-                                cmd.ExecuteNonQuery();
-                            }*/
-                        }
-                        Console.WriteLine("-----");
+                        elementsToStore.Add(analysisResult[i + j]);
                     }
                 }
 
             }
-        //}
+
+        }
+
+        imagedto.corte = elementsToStore[1];
+        imagedto.fecha = elementsToStore[2];
+        imagedto.opis = elementsToStore[3];
+        imagedto.monto = elementsToStore[4];
+        imagedto.archivo = elementsToStore[0];
+
+
+        using (var context = new ImageDbContext())
+        {
+            context.Database.EnsureCreated(); // Crear la base de datos si no existe
+
+            // Crear un nuevo objeto imageDto y asignarle los valores
+            var newImage = new imageDto
+                {
+                    corte = elementsToStore.Count > 0 ? elementsToStore[1] : null,
+                    fecha = elementsToStore.Count > 1 ? elementsToStore[2] : null,
+                    opis = elementsToStore.Count > 2 ? elementsToStore[3] : null,
+                    monto = elementsToStore.Count > 3 ? elementsToStore[4] : null,
+                    archivo = elementsToStore.Count > 4 ? elementsToStore[0] : null
+                };
+
+            // Agregar el nuevo objeto a DbSet y guardar los cambios en la base de datos
+            context.ImgData.Add(newImage);
+            context.SaveChanges();
+            checkdatabase(context);
+        }
     }
 
-    private bool IsDigit(string str)
+    private async void checkdatabase(ImageDbContext db)
     {
+        var results = from image in db.ImgData
+                      select image;
+
+        await foreach (var s in results.AsAsyncEnumerable())
+        {
+            Console.WriteLine("datos " + s.fecha);
+        }
+    }
+    private bool IsDigit(string str)
+    {   
         if (str == null) return false;
 
         foreach (char c in str)
