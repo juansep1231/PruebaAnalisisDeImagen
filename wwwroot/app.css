@@ -49,3 +49,13 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+.valid-message {
+    color: green;
+    font-size: 24px;
+}
+
+.invalid-message {
+    color: red;
+    font-size: 24px;
+}

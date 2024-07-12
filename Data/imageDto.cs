@@ -1,6 +1,6 @@
 ﻿namespace PruebaAnalisisDeImagen.Data
 {
-    public class imageDto
+    public class ImageDTO
     {
         public int Id { get; set; } // Clave principal
 

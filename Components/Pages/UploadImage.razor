@@ -7,7 +7,9 @@
 @using System
 @inject IConfiguration Configuration
 @rendermode InteractiveServer
+@using PruebaAnalisisDeImagen.Components.UIElements
 @using PruebaAnalisisDeImagen.Data
+@using PruebaAnalisisDeImagen.Models
 
 <div>
     <h2 class="display-4">Registro de cobros interbancarios</h2>
@@ -25,22 +27,18 @@
     <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
     <button class="btn btn-primary" type="submit">Confirmar</button>
 </EditForm>
+
+
 @if (imageUploaded)
 {
-    @if (succesfulWords == 4 && CompareWithSystemDate())
+    <MessageValidation SuccesfulWords="@succesfulWords" CompareDate="@succesfulDate" />
+    @if (elementsToStore.Count > 0)
     {
-        <div>
-            <h1>Validado exitosamente</h1>
-        </div>
+        <TableComponent elementsToStore="@elementsToStore" />
     }
-    else
-    {
-        <div>
-            <h1>No se pudo validar exitosamente</h1>
-        </div>
-    }
-
+   
 }
+
 
 @code {
     private ServerSignalRTicket Ticket { get; set; } = new();
@@ -49,39 +47,52 @@
     private List<string> analysisResult = new List<string>();
     private List<string> elementsToStore = new List<string>();
     private int succesfulWords = 0;
+    private bool succesfulDate = false;
     private string extractedDate;
     private int iii = 0;
     private bool imageUploaded = false;
+    private int indice = 0;
+    private ImageDTO imagedto = new ImageDTO();
 
     private void SetFile(InputFileChangeEventArgs e)
     {
-        Ticket.Attachments = e.GetMultipleFiles();
+        Ticket.Attachment = e.File;
+
     }
 
     private async Task OnSubmit()
     {
+
         try
         {
-            foreach (var file in    Ticket.Attachments)
-            {
-                string safeFileName = WebUtility.HtmlEncode(file.Name);
+            //Reiniciar estado del sistema para cargar mas de una imagen 
+            imageUploaded = false;
+            succesfulWords = 0;
+            analysisResult.Clear();
+            elementsToStore.Clear();
 
-                // Save file locally
-                var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
-                await using FileStream fs = new(path, FileMode.Create);
-                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
-                long fileSize = fs.Length;
-                Console.WriteLine(fileSize);
-                fs.Position = 0;
-                AnalyzeImage(fs);
-                CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
-                imageUploaded = true;
-                fs.Close();
-                File.Delete(path);
+            string safeFileName = WebUtility.HtmlEncode(Ticket.Attachment.Name);
 
-            }
+            // Save file locally
+            var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
+            await using FileStream fs = new(path, FileMode.Create);
+            await Ticket.Attachment.OpenReadStream(maxFileSize).CopyToAsync(fs);
+            long fileSize = fs.Length;
+            Console.WriteLine(fileSize);
+            fs.Position = 0;
+            AnalyzeImage(fs);
+            CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
+            CompareWithSystemDate();
+            var hhhh = handleSPI();
+            Console.WriteLine(hhhh);
+            imageUploaded = true;
+            fs.Close();
+            File.Delete(path);
+            indice++; //borrar pq es de la fecha de prueba
 
-            Message = "File uploaded!";
+
+
+            Message = "¡Archivo cargado!";
         }
         catch (Exception e)
         {
@@ -154,17 +165,16 @@
 
     private bool CompareWithSystemDate()
     {
-        if (analysisResult.Count == 0)
-        {
-            throw new InvalidOperationException("El elemento está vacío");
-        }
 
-        string imageDate = "10/07/2024"; //imagedto.fecha; //"07/10/2024"
+        //string imageDate = "12/07/2024"; //imagedto.fecha; //"07/10/2024"
+        string[] numeros = new string[] { "12/07/2024", "13/07/2024" };
+
         Console.WriteLine(imagedto.fecha);
-        if (DateTime.TryParseExact(imageDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
+        if (DateTime.TryParseExact(numeros[indice], "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
         {
             DateTime systemDate = DateTime.Now.Date;
-            return extractedDate==systemDate;
+            succesfulDate = extractedDate==systemDate;
+            return succesfulDate;
         }
         else
         {
@@ -172,8 +182,13 @@
         }
     }
 
+
+
+
+
+
     private string connectionString = "Host=192.168.137.22:5432;Username=postgres;Password=1234;Database=prueba18";
-    private imageDto imagedto = new imageDto();
+
 
     private void FetchData()
     {
@@ -192,7 +207,6 @@
             if (processMatches.Count > 0 && !processFound)
             {
                 elementsToStore.Add(str);
-                Console.WriteLine("aaaaaaaaaa" + str);
                 processFound = true;
 
             }
@@ -207,7 +221,7 @@
                 {
                     // Almacenar el match y los siguientes elementos en la base de datos
                     //List<string> elementsToStore = new List<string>();
-                    elementsToStore.Add(analysisResult[i - 1]);
+                    elementsToStore.Add(analysisResult[i - 1]); //agregar corte
                     elementsToStore.Add(str); // Agregar el match actual
 
                     // Agregar los siguientes cinco elementos si existen
@@ -233,7 +247,7 @@
             context.Database.EnsureCreated(); // Crear la base de datos si no existe
 
             // Crear un nuevo objeto imageDto y asignarle los valores
-            var newImage = new imageDto
+            var newImage = new ImageDTO
                 {
                     corte = elementsToStore.Count > 0 ? elementsToStore[1] : null,
                     fecha = elementsToStore.Count > 1 ? elementsToStore[2] : null,
@@ -274,10 +288,78 @@
     }
 
 
+    private void triggerSCIorSPIAnalysis()
+    {
+        if (imagedto.archivo.ToLower().Contains(Constants.SPI))
+        {
+
+        }
+        else if (imagedto.archivo.ToLower().Contains(Constants.SCI))
+        {
+            //logica para manaejar SCI
+        }
+        else
+        {
+            //logica por si no es ninguna de los dos 
+        }
+    }
+
+
+    private void handleSCI()
+    {
+
+    }
+
+    private bool handleSPI()
+    {
+        DateTime horaActual = DateTime.Now;
+        TimeSpan horaInicio;
+        TimeSpan horaFin;
+
+        var horariosSPI1 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
+    {
+        { "1", (new TimeSpan(8, 0, 0), new TimeSpan(9, 0, 0)) },
+        { "2", (new TimeSpan(13, 0, 0), new TimeSpan(14, 0, 0)) },
+        { "3", (new TimeSpan(17, 0, 0), new TimeSpan(18, 0, 0)) }
+    };
+
+        var horariosSPI3 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
+    {
+        { "1", (new TimeSpan(9, 0, 0), new TimeSpan(11, 0, 0)) },
+        { "2", (new TimeSpan(14, 0, 0), new TimeSpan(15, 0, 0)) },
+        { "3", (new TimeSpan(17, 0, 0), new TimeSpan(19, 0, 0)) }
+    };
+
+        Dictionary<string, (TimeSpan inicio, TimeSpan fin)> horarios;
+
+        switch (imagedto.archivo)
+        {
+            case "SPI1":
+                horarios = horariosSPI1;
+                break;
+            case "SPI3":
+                horarios = horariosSPI3;
+                break;
+            default:
+                throw new ArgumentException("Invalid 'archivo' value");
+        }
+
+        if (!horarios.TryGetValue(imagedto.corte, out var horario))
+        {
+            throw new ArgumentException($"Invalid 'corte' value for {imagedto.archivo}");
+        }
+
+        horaInicio = horario.inicio;
+        horaFin = horario.fin;
+
+        return (horaActual.TimeOfDay >= horaInicio && horaActual.TimeOfDay <= horaFin);
+    }
+
+
 
     private class ServerSignalRTicket
     {
 
-        public IReadOnlyList<IBrowserFile> Attachments { get; set; }
+        public IBrowserFile Attachment { get; set; }
     }
 }

@@ -4,7 +4,7 @@ namespace PruebaAnalisisDeImagen.Data
 {
     public class ImageDbContext : DbContext
     {
-        public DbSet<imageDto> ImgData { get; set; }
+        public DbSet<ImageDTO> ImgData { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
