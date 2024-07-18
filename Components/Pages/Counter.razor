@@ -1,19 +1,372 @@
-﻿@page "/counter"
+﻿@page "/monitor"
+@using System.Timers
 @rendermode InteractiveServer
+@inject IJSRuntime JS
 
 <PageTitle>Counter</PageTitle>
 
-<h1>Counter</h1>
+<h1>Monitoreo</h1>
+<input type="datetime" @bind="HoraIni"></input>
+<button @onclick="LimpiarLocalStorage">Limpiar Memoria Local</button>
 
-<p role="status">Current count: @currentCount</p>
+<div>
+    <label style="color:aliceblue">Hora Actual: @HoraIni.ToString("HH:mm:ss")</label>
+</div>
 
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+<div class="container">
+    @foreach (var button in buttons)
+    {
+        <div class="Contenedor">
+            <center class="Titulo">@button.Titulo</center>
+
+            @foreach (var corte in button.Cortes)
+            {
+                <button @onclick="() => IncrementarDia(button.Id, corte.Id)"
+                        disabled="@botonPresionado[button.Id][corte.Id]"
+                        class="CuadroSCI"
+                        style="background-color:@colores[button.Id][corte.Id]">
+                    @corte.Texto
+                </button>
+            }
+        </div>
+    }
+</div>
+
+<footer>
+    <hr />
+    <p style="color:aliceblue">
+        <span class="punto-verde"></span>
+        ¡Recordatorio! El Tiempo para enviar los datos está corriendo
+    </p>
+    <p style="color:aliceblue">
+        <span class="punto-amarillo"></span>
+        ¡Atención! Tiempo límite por acercarse
+    </p>
+    <p style="color:aliceblue">
+        <span class="punto-rojo"></span>
+        ¡Alerta! Tiempo límite por agotarse.
+    </p>
+    <p style="color:aliceblue">
+        <span class="punto-vino"></span>
+        ¡Emergencia! El tiempo limite a expirado.
+    </p>
+</footer>
 
 @code {
-    private int currentCount = 0;
+    private DateTime HoraIni= DateTime.Now;
+    private Timer? timer;
+    DateTime fechaActual = DateTime.Today;
 
-    private void IncrementCount()
+    private List<ButtonGroup> buttons = new List<ButtonGroup>
     {
-        currentCount++;
+        new ButtonGroup { Id = 1, Titulo = "SCI1", Cortes = new List<Corte> {
+            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(10).AddMinutes(0) },
+            new Corte { Id = 2, Texto = "Corte 2", HoraFin = DateTime.Today.AddHours(11).AddMinutes(0) },
+            new Corte { Id = 3, Texto = "Corte 3", HoraFin = DateTime.Today.AddHours(12).AddMinutes(0) },
+        }},
+        new ButtonGroup { Id = 3, Titulo = "SPI3", Cortes = new List<Corte> {
+            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(11).AddMinutes(0) },
+            new Corte { Id = 2, Texto = "Corte 2", HoraFin = DateTime.Today.AddHours(15).AddMinutes(0) },
+            new Corte { Id = 3, Texto = "Corte 3", HoraFin = DateTime.Today.AddHours(19).AddMinutes(0) },
+        }},
+        new ButtonGroup { Id = 5, Titulo = "SPI1", Cortes = new List<Corte> {
+            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(9).AddMinutes(0) },
+            new Corte { Id = 2, Texto = "Corte 2", HoraFin = DateTime.Today.AddHours(13).AddMinutes(0) },
+            new Corte { Id = 3, Texto = "Corte 3", HoraFin = DateTime.Today.AddHours(16).AddMinutes(45) },
+        }},
+        new ButtonGroup { Id = 7, Titulo = "SCI3", Cortes = new List<Corte> {
+            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(16).AddMinutes(0) },
+        }},
+
+    };
+
+    private Dictionary<int, Dictionary<int, bool>> botonPresionado = new();
+    private Dictionary<int, Dictionary<int, string>> colores = new();
+
+    protected override void OnInitialized()
+    {
+        timer = new Timer(1000);
+        timer.Elapsed += OnTimerElapsed;
+        timer.AutoReset = true;
+        timer.Enabled = true;
+
+        foreach (var button in buttons)
+        {
+            botonPresionado[button.Id] = new Dictionary<int, bool>();
+            colores[button.Id] = new Dictionary<int, string>();
+
+            foreach (var corte in button.Cortes)
+            {
+                botonPresionado[button.Id][corte.Id] = false;
+                colores[button.Id][corte.Id] = "white";
+            }
+        }
+        _ = LoadStateFromLocalStorage();
+
+
+    }
+
+    private void OnTimerElapsed(object? sender, ElapsedEventArgs e)
+    {
+
+        if (HoraIni.Hour == 23 && HoraIni.Minute == 55)
+        {
+            DateTime fechaActual = DateTime.Today;
+
+            foreach (var button in buttons)
+            {
+                foreach (var corte in button.Cortes)
+                {
+                    botonPresionado[button.Id][corte.Id] = false;
+                    corte.Texto = "Corte " + corte.Id;
+                    colores[button.Id][corte.Id] = "white";
+                    if (corte.HoraFin.Date == fechaActual)
+                    {
+                        corte.HoraFin = corte.HoraFin.AddDays(1);
+                    }
+                }
+               
+            }
+            _ =LimpiarLocalStorage();
+        }
+        HoraIni = DateTime.Now;
+
+        InvokeAsync(() =>
+        {
+            UpdateColors();
+            StateHasChanged();
+        });
+
+    }
+
+    private void UpdateColors()
+    {
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                colores[button.Id][corte.Id] = CalculateColor(HoraIni, corte.HoraFin);
+            }
+        }
+    }
+
+    private void IncrementarDia(int buttonId, int corteId)
+    {
+        var corte = buttons.First(b => b.Id == buttonId).Cortes.First(c => c.Id == corteId);
+
+        if (corte.HoraFin < HoraIni)
+            return;
+
+        corte.Texto = "¡Enviado!";
+        corte.HoraFin = corte.HoraFin.AddDays(1);
+        botonPresionado[buttonId][corteId] = true;
+        _ = SaveStateToLocalStorage();
+    }
+
+    private string CalculateColor(DateTime start, DateTime end)
+    {
+        TimeSpan difference = end - start;
+        int totalMinutes = (int)difference.TotalMinutes;
+
+
+        return totalMinutes switch
+        {
+            int n when n <= 15 && n >= 0 => "red",
+            int n when n < 40 && n > 15 => "yellow",
+            int n when n <= 60 && n >= 40 => "green",
+            int n when n <= 0 => "#42214b",
+            _ => "white"
+        };
+
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+
+    private class ButtonGroup
+    {
+        public int Id { get; set; }
+        public string? Titulo { get; set; }
+        public List<Corte> Cortes { get; set; } = new();
+    }
+
+    private class Corte
+    {
+        public int Id { get; set; }
+        public string Texto { get; set; } = string.Empty;
+        public DateTime HoraFin { get; set; }
+    }
+    private async Task LimpiarLocalStorage()
+    {
+        await JS.InvokeVoidAsync("localStorage.clear");
+        DateTime fechaActual = DateTime.Today;
+
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                botonPresionado[button.Id][corte.Id] = false;
+                corte.Texto = "Corte " + corte.Id;
+                colores[button.Id][corte.Id] = "white";
+                if (corte.HoraFin.Date == fechaActual)
+                {
+                    corte.HoraFin = corte.HoraFin.AddDays(1);
+                }
+            }
+        }
+    }
+    private async Task SaveStateToLocalStorage()
+    {
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                string key = $"button_{button.Id}corte{corte.Id}";
+                var state = new ButtonState
+                    {
+                        Texto = corte.Texto,
+                        HoraFin = corte.HoraFin,
+                        BotonPresionado = botonPresionado[button.Id][corte.Id]
+                    };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(state);
+                await JS.InvokeVoidAsync("localStorage.setItem", key, json);
+            }
+        }
+    }
+    private async Task LoadStateFromLocalStorage()
+    {
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                string key = $"button_{button.Id}corte{corte.Id}";
+                var json = await JS.InvokeAsync<string>("localStorage.getItem", key);
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var state = System.Text.Json.JsonSerializer.Deserialize<ButtonState>(json);
+                    if (state != null)
+                    {
+                        corte.Texto = state.Texto;
+                        corte.HoraFin = state.HoraFin;
+                        botonPresionado[button.Id][corte.Id] = state.BotonPresionado;
+                    }
+                }
+            }
+        }
+    }
+    private class ButtonState
+    {
+        public string? Texto { get; set; }
+        public DateTime HoraFin { get; set; }
+        public bool BotonPresionado { get; set; }
     }
 }
+
+<style>
+    body {
+        background-color: #333;
+    }
+
+    .CuadroSCI {
+        width: 80px; /* Ajusta el tamaño del botón */
+        height: 80px; /* Ajusta el tamaño del botón */
+        border: none;
+        margin: 10px;
+        line-height: 50px; /* Centra el texto verticalmente */
+        color: black;
+        border-radius: 50%; /* Hace el botón circular */
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5); /* Sombra interior */
+        margin-bottom: 20px;
+    }
+
+    .punto-rojo {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: red;
+        border-radius: 50%; /* Hace que el punto sea circular */
+        margin-right: 5px; /* Espacio entre el punto y el texto */
+        color: aliceblue;
+    }
+
+    .punto-vino {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: #360d0d;
+        border-radius: 50%; /* Hace que el punto sea circular */
+        margin-right: 5px; /* Espacio entre el punto y el texto */
+        color: aliceblue;
+    }
+
+    .punto-verde {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: green;
+        border-radius: 50%; /* Hace que el punto sea circular */
+        margin-right: 5px; /* Espacio entre el punto y el texto */
+        color: aliceblue;
+    }
+
+    .punto-amarillo {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: yellow;
+        border-radius: 50%; /* Hace que el punto sea circular */
+        margin-right: 5px; /* Espacio entre el punto y el texto */
+        color: aliceblue;
+    }
+
+    .container {
+        display: flex;
+        justify-content: center; /* Centra horizontalmente el contenido */
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 25px;
+    }
+
+    .Titulo {
+        margin-top: 5px;
+        color: aliceblue;
+        font-weight: bold; /* Negritas */
+        font-size: 23px; /* Tamaño más grande */
+        font-family: 'Arial', sans-serif; /* Tipografía de título */
+    }
+
+    .Contenedor {
+        background-color: #222;
+        border-radius: 25px;
+        box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        padding-bottom: 30px;
+        padding-left: 15px;
+        padding-right: 15px;
+        height: 399px;
+        width: 150px;
+        border: 2px solid #71A639;
+    }
+
+    .Frase {
+        text-align: center;
+        color: #71A639;
+        margin-top: 10px;
+        margin-top: 10px;
+    }
+
+    h1 {
+        margin-top: 5px;
+        color: aliceblue;
+        font-weight: bold; /* Negritas */
+        font-size: 55px; /* Tamaño más grande */
+        font-family: 'Arial', sans-serif; /* Tipografía de título */
+    }
+</style>

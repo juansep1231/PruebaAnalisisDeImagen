@@ -1,0 +1,33 @@
+﻿@page "/send-alert"
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components
+
+<h3>Enviar Alerta a Microsoft Teams</h3>
+<button @onclick="SendAlert">Enviar Alerta</button>
+
+@code {
+    [Inject]
+    private HttpClient Http { get; set; }
+
+    private async Task SendAlert()
+    {
+        var url = "YOUR_POWER_AUTOMATE_WEBHOOK_URL"; // Reemplaza con la URL del webhook de Power Automate
+        var content = new
+        {
+            message = "Esta es una alerta desde Blazor"
+        };
+
+        var response = await Http.PostAsJsonAsync(url, content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Mensaje enviado con éxito");
+        }
+        else
+        {
+            Console.WriteLine("Error al enviar el mensaje");
+        }
+    }
+}

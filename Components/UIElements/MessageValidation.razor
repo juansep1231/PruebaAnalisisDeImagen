@@ -1,10 +1,4 @@
-﻿@if (SuccesfulWords == 4 && CompareDate)
-{
-    <div>
-        <h3 class="text-success"> Validado exitosamente</h3>
-    </div>
-}
-else if (SuccesfulWords < 4)
+﻿@if (SuccesfulWords < 4)
 {
     <div>
         <h3 class="text-danger"> Falta el mensaje de confirmación de carga exitosa {@SuccesfulWords}</h3>
@@ -15,6 +9,18 @@ else if (!CompareDate)
     <div>
         <h3 class="text-danger">La fecha de la imagen no concuerda con la fecha actual</h3>
     </div>
+}
+else if (!CompareTime)
+{
+    <div>
+        <h3 class="text-danger">Fuera de horario</h3>
+    </div>
+}
+else if (SuccesfulWords == 4 && CompareDate && CompareTime)
+{
+<div>
+    <h3 class="text-success"> Validado exitosamente</h3>
+</div>
 }
 else
 {
@@ -30,6 +36,7 @@ else
     [Parameter]
     public bool CompareDate { get; set; }
 
+    [Parameter]
     public bool CompareTime { get; set; }
 }
 

@@ -16,6 +16,7 @@
     Carga el archivo de registro.
 </div>
 
+
 @if (Message.Length > 0)
 {
     <p class="alert alert-secondary" role="alert">@Message</p>
@@ -31,73 +32,128 @@
 
 @if (imageUploaded)
 {
-    <MessageValidation SuccesfulWords="@succesfulWords" CompareDate="@succesfulDate" />
+    <MessageValidation SuccesfulWords="@succesfulWords" CompareDate="@succesfulDate" CompareTime="@successfulTime" />
     @if (elementsToStore.Count > 0)
     {
         <TableComponent elementsToStore="@elementsToStore" />
     }
-   
 }
+
+<h3>Configurar Horarios</h3>
+<EditForm Model="@TimeConfiguration" OnValidSubmit="@SaveTimeConfiguration">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <h4>SPI1</h4>
+    <div class="form-group">
+        <label for="spi1-1">1</label>
+        <input type="time" id="spi1-1-start" @bind="TimeConfiguration.SPI1_1_Start" class="form-control" />
+        <input type="time" id="spi1-1-end" @bind="TimeConfiguration.SPI1_1_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="spi1-2">2</label>
+        <input type="time" id="spi1-2-start" @bind="TimeConfiguration.SPI1_2_Start" class="form-control" />
+        <input type="time" id="spi1-2-end" @bind="TimeConfiguration.SPI1_2_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="spi1-3">3</label>
+        <input type="time" id="spi1-3-start" @bind="TimeConfiguration.SPI1_3_Start" class="form-control" />
+        <input type="time" id="spi1-3-end" @bind="TimeConfiguration.SPI1_3_End" class="form-control" />
+    </div>
+
+    <h4>SPI3</h4>
+    <div class="form-group">
+        <label for="spi3-1">1</label>
+        <input type="time" id="spi3-1-start" @bind="TimeConfiguration.SPI3_1_Start" class="form-control" />
+        <input type="time" id="spi3-1-end" @bind="TimeConfiguration.SPI3_1_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="spi3-2">2</label>
+        <input type="time" id="spi3-2-start" @bind="TimeConfiguration.SPI3_2_Start" class="form-control" />
+        <input type="time" id="spi3-2-end" @bind="TimeConfiguration.SPI3_2_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="spi3-3">3</label>
+        <input type="time" id="spi3-3-start" @bind="TimeConfiguration.SPI3_3_Start" class="form-control" />
+        <input type="time" id="spi3-3-end" @bind="TimeConfiguration.SPI3_3_End" class="form-control" />
+    </div>
+
+    <h4>SCI1</h4>
+    <div class="form-group">
+        <label for="sci1-1">1</label>
+        <input type="time" id="sci1-1-start" @bind="TimeConfiguration.SCI1_1_Start" class="form-control" />
+        <input type="time" id="sci1-1-end" @bind="TimeConfiguration.SCI1_1_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="sci1-2">2</label>
+        <input type="time" id="sci1-2-start" @bind="TimeConfiguration.SCI1_2_Start" class="form-control" />
+        <input type="time" id="sci1-2-end" @bind="TimeConfiguration.SCI1_2_End" class="form-control" />
+    </div>
+    <div class="form-group">
+        <label for="sci1-3">3</label>
+        <input type="time" id="sci1-3-start" @bind="TimeConfiguration.SCI1_3_Start" class="form-control" />
+        <input type="time" id="sci1-3-end" @bind="TimeConfiguration.SCI1_3_End" class="form-control" />
+    </div>
+
+    <h4>SCI3</h4>
+    <div class="form-group">
+        <label for="sci3-1">1</label>
+        <input type="time" id="sci3-1-start" @bind="TimeConfiguration.SCI3_1_Start" class="form-control" />
+        <input type="time" id="sci3-1-end" @bind="TimeConfiguration.SCI3_1_End" class="form-control" />
+    </div>
+
+    <button class="btn btn-primary" type="submit">Guardar</button>
+</EditForm>
+
 
 
 @code {
     private ServerSignalRTicket Ticket { get; set; } = new();
-    private long maxFileSize = 5120000; 
+    private long maxFileSize = 5120000;
     private string Message { get; set; } = String.Empty;
     private List<string> analysisResult = new List<string>();
     private List<string> elementsToStore = new List<string>();
-    private int succesfulWords = 0;
-    private bool succesfulDate = false;
+    private int succesfulWords = 4;
+    private bool succesfulDate = true;
+    private bool successfulTime = false;
     private string extractedDate;
     private int iii = 0;
-    private bool imageUploaded = false;
+    private bool imageUploaded = true;
     private int indice = 0;
     private ImageDTO imagedto = new ImageDTO();
+    DateTime horaActual = DateTime.Now;
+    string corte = "1";
+
+    // Modelo para almacenar los horarios configurables
+    private TimeConfigurationModel TimeConfiguration { get; set; } = new();
 
     private void SetFile(InputFileChangeEventArgs e)
     {
         Ticket.Attachment = e.File;
-
     }
 
     private async Task OnSubmit()
     {
-
         try
         {
-            //Reiniciar estado del sistema para cargar mas de una imagen 
             imageUploaded = false;
-            succesfulWords = 0;
+            succesfulWords = 4;
             analysisResult.Clear();
             elementsToStore.Clear();
-
-            string safeFileName = WebUtility.HtmlEncode(Ticket.Attachment.Name);
-
-            // Save file locally
-            var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
-            await using FileStream fs = new(path, FileMode.Create);
-            await Ticket.Attachment.OpenReadStream(maxFileSize).CopyToAsync(fs);
-            long fileSize = fs.Length;
-            Console.WriteLine(fileSize);
-            fs.Position = 0;
-            AnalyzeImage(fs);
-            CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
-            CompareWithSystemDate();
-            var hhhh = handleSPI();
-            Console.WriteLine(hhhh);
+            handleSCI();
             imageUploaded = true;
-            fs.Close();
-            File.Delete(path);
-            indice++; //borrar pq es de la fecha de prueba
-
-
-
+            indice++;
             Message = "¡Archivo cargado!";
         }
         catch (Exception e)
         {
             Message = "Error: " + e.Message;
         }
+    }
+
+    private void SaveTimeConfiguration()
+    {
+        Message = "Horarios guardados exitosamente.";
     }
 
     private void AnalyzeImage(FileStream imageFileStream)
@@ -109,7 +165,6 @@
             new Uri(endpoint),
             new AzureKeyCredential(key));
 
-        // using FileStream stream = new FileStream("pruebavision.png", FileMode.Open);
         FileStream stream = imageFileStream;
         BinaryData imageData = BinaryData.FromStream(stream);
 
@@ -146,34 +201,28 @@
             iii++;
         }
         FetchData();
-
-
     }
 
     private void CompareWithFixedData(string[] fixedData)
     {
         List<bool> comparisonResults = new List<bool>();
 
-
         for (int i = 0; i < fixedData.Length && i < analysisResult.Count; i++)
         {
             comparisonResults.Add(fixedData[i] == analysisResult[i]);
             succesfulWords++;
         }
-
     }
 
     private bool CompareWithSystemDate()
     {
-
-        //string imageDate = "12/07/2024"; //imagedto.fecha; //"07/10/2024"
         string[] numeros = new string[] { "12/07/2024", "13/07/2024" };
 
         Console.WriteLine(imagedto.fecha);
         if (DateTime.TryParseExact(numeros[indice], "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
         {
             DateTime systemDate = DateTime.Now.Date;
-            succesfulDate = extractedDate==systemDate;
+            succesfulDate = extractedDate == systemDate;
             return succesfulDate;
         }
         else
@@ -182,13 +231,7 @@
         }
     }
 
-
-
-
-
-
     private string connectionString = "Host=192.168.137.22:5432;Username=postgres;Password=1234;Database=prueba18";
-
 
     private void FetchData()
     {
@@ -196,7 +239,6 @@
         string processPattern = @"S[CP]I[1-3]";
         const int numElementsToStore = 3;
         bool processFound = false;
-
 
         for (int i = 0; i < analysisResult.Count; i++)
         {
@@ -208,31 +250,24 @@
             {
                 elementsToStore.Add(str);
                 processFound = true;
-
             }
 
             if (matches.Count > 0)
             {
-                // Verificar el elemento anterior y el siguiente
                 bool previousIsDigit = i > 0 && IsDigit(analysisResult[i - 1]);
                 bool nextIsDigit = i < analysisResult.Count - 1 && IsDigit(analysisResult[i + 1]);
 
                 if (previousIsDigit && nextIsDigit)
                 {
-                    // Almacenar el match y los siguientes elementos en la base de datos
-                    //List<string> elementsToStore = new List<string>();
-                    elementsToStore.Add(analysisResult[i - 1]); //agregar corte
-                    elementsToStore.Add(str); // Agregar el match actual
+                    elementsToStore.Add(analysisResult[i - 1]);
+                    elementsToStore.Add(str);
 
-                    // Agregar los siguientes cinco elementos si existen
                     for (int j = 1; j <= numElementsToStore - 1 && (i + j) < analysisResult.Count; j++)
                     {
                         elementsToStore.Add(analysisResult[i + j]);
                     }
                 }
-
             }
-
         }
 
         imagedto.corte = elementsToStore[1];
@@ -241,12 +276,10 @@
         imagedto.monto = elementsToStore[4];
         imagedto.archivo = elementsToStore[0];
 
-
         using (var context = new ImageDbContext())
         {
-            context.Database.EnsureCreated(); // Crear la base de datos si no existe
+            context.Database.EnsureCreated();
 
-            // Crear un nuevo objeto imageDto y asignarle los valores
             var newImage = new ImageDTO
                 {
                     corte = elementsToStore.Count > 0 ? elementsToStore[1] : null,
@@ -256,7 +289,6 @@
                     archivo = elementsToStore.Count > 4 ? elementsToStore[0] : null
                 };
 
-            // Agregar el nuevo objeto a DbSet y guardar los cambios en la base de datos
             context.ImgData.Add(newImage);
             context.SaveChanges();
             checkdatabase(context);
@@ -273,8 +305,9 @@
             Console.WriteLine("datos " + s.fecha);
         }
     }
+
     private bool IsDigit(string str)
-    {   
+    {
         if (str == null) return false;
 
         foreach (char c in str)
@@ -288,78 +321,96 @@
     }
 
 
-    private void triggerSCIorSPIAnalysis()
+    private bool handleSCI()
     {
-        if (imagedto.archivo.ToLower().Contains(Constants.SPI))
-        {
-
-        }
-        else if (imagedto.archivo.ToLower().Contains(Constants.SCI))
-        {
-            //logica para manaejar SCI
-        }
-        else
-        {
-            //logica por si no es ninguna de los dos 
-        }
-    }
-
-
-    private void handleSCI()
-    {
-
-    }
-
-    private bool handleSPI()
-    {
-        DateTime horaActual = DateTime.Now;
-        TimeSpan horaInicio;
-        TimeSpan horaFin;
-
         var horariosSPI1 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
     {
-        { "1", (new TimeSpan(8, 0, 0), new TimeSpan(9, 0, 0)) },
-        { "2", (new TimeSpan(13, 0, 0), new TimeSpan(14, 0, 0)) },
-        { "3", (new TimeSpan(17, 0, 0), new TimeSpan(18, 0, 0)) }
+        { "1", (TimeConfiguration.SPI1_1_Start.TimeOfDay, TimeConfiguration.SPI1_1_End.TimeOfDay) },
+        { "2", (TimeConfiguration.SPI1_2_Start.TimeOfDay, TimeConfiguration.SPI1_2_End.TimeOfDay) },
+        { "3", (TimeConfiguration.SPI1_3_Start.TimeOfDay, TimeConfiguration.SPI1_3_End.TimeOfDay) }
     };
 
         var horariosSPI3 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
     {
-        { "1", (new TimeSpan(9, 0, 0), new TimeSpan(11, 0, 0)) },
-        { "2", (new TimeSpan(14, 0, 0), new TimeSpan(15, 0, 0)) },
-        { "3", (new TimeSpan(17, 0, 0), new TimeSpan(19, 0, 0)) }
+        { "1", (TimeConfiguration.SPI3_1_Start.TimeOfDay, TimeConfiguration.SPI3_1_End.TimeOfDay) },
+        { "2", (TimeConfiguration.SPI3_2_Start.TimeOfDay, TimeConfiguration.SPI3_2_End.TimeOfDay) },
+        { "3", (TimeConfiguration.SPI3_3_Start.TimeOfDay, TimeConfiguration.SPI3_3_End.TimeOfDay) }
     };
 
-        Dictionary<string, (TimeSpan inicio, TimeSpan fin)> horarios;
+        var horariosSCI1 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
+    {
+        { "1", (TimeConfiguration.SCI1_1_Start.TimeOfDay, TimeConfiguration.SCI1_1_End.TimeOfDay) },
+        { "2", (TimeConfiguration.SCI1_2_Start.TimeOfDay, TimeConfiguration.SCI1_2_End.TimeOfDay) },
+        { "3", (TimeConfiguration.SCI1_3_Start.TimeOfDay, TimeConfiguration.SCI1_3_End.TimeOfDay) }
+    };
 
-        switch (imagedto.archivo)
+        var horariosSCI3 = new Dictionary<string, (TimeSpan inicio, TimeSpan fin)>
+    {
+        { "1", (TimeConfiguration.SCI3_1_Start.TimeOfDay, TimeConfiguration.SCI3_1_End.TimeOfDay) }
+    };
+
+        (TimeSpan inicio, TimeSpan fin) horarios;
+
+        switch ("SCI1")
         {
             case "SPI1":
-                horarios = horariosSPI1;
+                horarios = horariosSPI1[corte];
                 break;
             case "SPI3":
-                horarios = horariosSPI3;
+                horarios = horariosSPI3[corte];
+                break;
+            case "SCI1":
+                horarios = horariosSCI1[corte];
+                break;
+            case "SCI3":
+                horarios = horariosSCI3[corte];
                 break;
             default:
                 throw new ArgumentException("Invalid 'archivo' value");
         }
 
-        if (!horarios.TryGetValue(imagedto.corte, out var horario))
-        {
-            throw new ArgumentException($"Invalid 'corte' value for {imagedto.archivo}");
-        }
+        bool successfulTime = compareTime(horarios);
 
-        horaInicio = horario.inicio;
-        horaFin = horario.fin;
-
-        return (horaActual.TimeOfDay >= horaInicio && horaActual.TimeOfDay <= horaFin);
+        return successfulTime;
     }
 
 
+    private bool compareTime((TimeSpan inicio, TimeSpan fin) horarios)
+    {
+        var now = DateTime.Now.TimeOfDay;
+        return now >= horarios.inicio && now <= horarios.fin;
+    }
 
     private class ServerSignalRTicket
     {
-
         public IBrowserFile Attachment { get; set; }
     }
+
+    public class TimeConfigurationModel
+    {
+        public DateTime SPI1_1_Start { get; set; }
+        public DateTime SPI1_1_End { get; set; }
+        public DateTime SPI1_2_Start { get; set; }
+        public DateTime SPI1_2_End { get; set; }
+        public DateTime SPI1_3_Start { get; set; }
+        public DateTime SPI1_3_End { get; set; }
+
+        public DateTime SPI3_1_Start { get; set; }
+        public DateTime SPI3_1_End { get; set; }
+        public DateTime SPI3_2_Start { get; set; }
+        public DateTime SPI3_2_End { get; set; }
+        public DateTime SPI3_3_Start { get; set; }
+        public DateTime SPI3_3_End { get; set; }
+
+        public DateTime SCI1_1_Start { get; set; }
+        public DateTime SCI1_1_End { get; set; }
+        public DateTime SCI1_2_Start { get; set; }
+        public DateTime SCI1_2_End { get; set; }
+        public DateTime SCI1_3_Start { get; set; }
+        public DateTime SCI1_3_End { get; set; }
+
+        public DateTime SCI3_1_Start { get; set; }
+        public DateTime SCI3_1_End { get; set; }
+    }
+
 }
