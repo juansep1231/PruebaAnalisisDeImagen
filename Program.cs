@@ -1,13 +1,18 @@
 using PruebaAnalisisDeImagen.Components;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using PruebaAnalisisDeImagen.Models;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddSingleton<ImageDataSharingService>();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? "https://localhost:5001") });
 
 var app = builder.Build();
@@ -22,9 +27,12 @@ if (!app.Environment.IsDevelopment())
 
 
 
-app.UseAntiforgery();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseRouting();
+app.UseAntiforgery();
+app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

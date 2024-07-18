@@ -10,6 +10,8 @@
 @using PruebaAnalisisDeImagen.Components.UIElements
 @using PruebaAnalisisDeImagen.Data
 @using PruebaAnalisisDeImagen.Models
+@inject ImageDataSharingService ImageDataService
+
 
 <div>
     <h2 class="display-4">Registro de cobros interbancarios</h2>
@@ -26,7 +28,7 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
     <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
-    <button class="btn btn-primary" type="submit">Confirmar</button>
+    <button class="btn btn-primary" @onclick="EnviarDatos" type="submit">Confirmar</button>
 </EditForm>
 
 
@@ -123,6 +125,7 @@
     private ImageDTO imagedto = new ImageDTO();
     DateTime horaActual = DateTime.Now;
     string corte = "1";
+    public event Action<string, string> OnDataSent;
 
     // Modelo para almacenar los horarios configurables
     private TimeConfigurationModel TimeConfiguration { get; set; } = new();
@@ -134,15 +137,38 @@
 
     private async Task OnSubmit()
     {
+
         try
         {
+            //Reiniciar estado del sistema para cargar mas de una imagen
             imageUploaded = false;
-            succesfulWords = 4;
+            succesfulWords = 0;
             analysisResult.Clear();
             elementsToStore.Clear();
+
+            //string safeFileName = WebUtility.HtmlEncode(Ticket.Attachment.Name);
+
+            // Save file locally
+            //var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
+            //await using FileStream fs = new(path, FileMode.Create);
+            //await Ticket.Attachment.OpenReadStream(maxFileSize).CopyToAsync(fs);
+            //long fileSize = fs.Length;
+            //Console.WriteLine(fileSize);
+            //fs.Position = 0;
+            //AnalyzeImage(fs);
+            //CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
+            //CompareWithSystemDate();
             handleSCI();
             imageUploaded = true;
-            indice++;
+            //fs.Close();
+            //File.Delete(path);
+            indice++; //borrar pq es de la fecha de prueba
+            imagedto.archivo = "SPI3"; // Reemplaza con el valor real obtenido
+            imagedto.corte = "1"; // Reemplaza con el valor real obtenido
+
+            ImageDataService.SetImageData(imagedto.archivo, imagedto.corte);
+
+
             Message = "¡Archivo cargado!";
         }
         catch (Exception e)
@@ -151,9 +177,16 @@
         }
     }
 
+
+
     private void SaveTimeConfiguration()
     {
         Message = "Horarios guardados exitosamente.";
+    }
+
+    private void EnviarDatos()
+    {
+        OnSubmit();
     }
 
     private void AnalyzeImage(FileStream imageFileStream)
@@ -165,6 +198,7 @@
             new Uri(endpoint),
             new AzureKeyCredential(key));
 
+        // using FileStream stream = new FileStream("pruebavision.png", FileMode.Open);
         FileStream stream = imageFileStream;
         BinaryData imageData = BinaryData.FromStream(stream);
 
@@ -182,7 +216,6 @@
             imageData,
             visualFeatures,
             options);
-
 
         foreach (DetectedTextBlock block in result.Read.Blocks)
         {
@@ -216,6 +249,8 @@
 
     private bool CompareWithSystemDate()
     {
+        
+        //string imageDate = "12/07/2024"; //imagedto.fecha; //"07/10/2024"
         string[] numeros = new string[] { "12/07/2024", "13/07/2024" };
 
         Console.WriteLine(imagedto.fecha);
@@ -254,19 +289,24 @@
 
             if (matches.Count > 0)
             {
+                // Verificar el elemento anterior y el siguiente
                 bool previousIsDigit = i > 0 && IsDigit(analysisResult[i - 1]);
                 bool nextIsDigit = i < analysisResult.Count - 1 && IsDigit(analysisResult[i + 1]);
 
                 if (previousIsDigit && nextIsDigit)
                 {
-                    elementsToStore.Add(analysisResult[i - 1]);
-                    elementsToStore.Add(str);
+                    // Almacenar el match y los siguientes elementos en la base de datos
+                    //List<string> elementsToStore = new List<string>();
+                    elementsToStore.Add(analysisResult[i - 1]); //agregar corte
+                    elementsToStore.Add(str); // Agregar el match actual
 
+                    // Agregar los siguientes cinco elementos si existen
                     for (int j = 1; j <= numElementsToStore - 1 && (i + j) < analysisResult.Count; j++)
                     {
                         elementsToStore.Add(analysisResult[i + j]);
                     }
                 }
+
             }
         }
 
