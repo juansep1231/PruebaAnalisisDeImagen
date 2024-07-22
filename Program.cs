@@ -1,8 +1,9 @@
 using PruebaAnalisisDeImagen.Components;
-using Microsoft.AspNetCore.Antiforgery;
+//using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.AspNetCore.Components.Web;
+//using Microsoft.Extensions.DependencyInjection;
+//using Microsoft.AspNetCore.ResponseCompression;
 using System.Net;
 using PruebaAnalisisDeImagen.Models;
 

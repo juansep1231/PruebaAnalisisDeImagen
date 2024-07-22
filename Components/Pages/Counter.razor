@@ -8,12 +8,7 @@
 
 <PageTitle>Counter</PageTitle>
 <h1>Monitoreo</h1>
-@* <input type="datetime" @bind="HoraIni"></input>
- *@
-
-<p>Archivo: @ImageDataService.Archivo</p>
-<p>Corte: @ImageDataService.Corte</p>
-
+<p style="color:aliceblue">Ultimo archivo subido: @ImageDataService.Archivo @ImageDataService.Corte</p>
 <div>
     <label style="color:aliceblue">Hora Actual: @HoraIni.ToString("HH:mm:ss")</label>
 </div>
@@ -26,7 +21,7 @@
 
             @foreach (var corte in button.Cortes)
             {
-                <button @onclick="() => CorteEnviado(button.Id, corte.Id)"
+                <button @onclick="() => CorteEnviado()"
                         disabled="@botonPresionado[button.Id][corte.Id]"
                         class="CuadroSCI @(colores[button.Id][corte.Id] == "red" ? "red-text-x" : (colores[button.Id][corte.Id] == "green" ? "green-text-check" : ""))"
                         style="background-color:@colores[button.Id][corte.Id]">
@@ -65,6 +60,9 @@
 </footer>
 
 @code {
+
+
+    //
     private DateTime HoraIni;
     private Timer? timer;
     //Inicialización de cortes
@@ -77,7 +75,7 @@
             new Corte { Id = 3, Texto = "Corte 3", HoraFin = DateTime.Today.AddHours(12).AddMinutes(0) },
         }},
         new ButtonGroup { Id = 3, Titulo = "SPI3", Cortes = new List<Corte> {
-            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(11).AddMinutes(0) },
+            new Corte { Id = 1, Texto = "Corte 1", HoraFin = DateTime.Today.AddHours(13).AddMinutes(0) },
             new Corte { Id = 2, Texto = "Corte 2", HoraFin = DateTime.Today.AddHours(15).AddMinutes(0) },
             new Corte { Id = 3, Texto = "Corte 3", HoraFin = DateTime.Today.AddHours(19).AddMinutes(0) },
         }},
@@ -94,9 +92,25 @@
 
     private Dictionary<int, Dictionary<int, bool>> botonPresionado = new();
     private Dictionary<int, Dictionary<int, string>> colores = new();
+    private HubConnection hubConnection;
 
     protected override void OnInitialized()
     {
+
+        // hubConnection = new HubConnectionBuilder()
+        //     .WithUrl(NavigationManager.ToAbsoluteUri("/control4543"))
+        //     .Build();
+
+        // hubConnection.On<int, int, string>("ReceiveCorteUpdate", (buttonId, corteId, color) =>
+        // {
+        //     InvokeAsync(() =>
+        //     {
+        //         colores[buttonId][corteId] = color;
+        //         StateHasChanged();
+        //     });
+        // });
+
+        // _= hubConnection.StartAsync();
 
 
         timer = new Timer(1000);
@@ -116,15 +130,11 @@
                 colores[button.Id][corte.Id] = "white";
             }
         }
-
+        _ = LoadColorsFromLocalStorage();
     }
-    //verificar
-    private void ManejarDatos(string numero, string mensaje)
-    {
-        // Manejar los datos recibidos como desees
-        Console.WriteLine($"Número recibido: {numero}, Mensaje recibido: {mensaje}");
-    }
+    //Agregado
 
+    //
     private void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
 
@@ -134,8 +144,6 @@
             {
                 foreach (var corte in button.Cortes)
                 {
-                    botonPresionado[button.Id][corte.Id] = false;
-                    //corte.Texto = "Corte " + corte.Id;
                     colores[button.Id][corte.Id] = "white";
                 }
             }
@@ -144,6 +152,8 @@
         InvokeAsync(() =>
         {
             UpdateColors();
+            CorteEnviado();
+            _ = SaveColorsToLocalStorage();
             StateHasChanged();
 
         });
@@ -162,24 +172,27 @@
                     int minuto = corte.HoraFin.Minute;
                     DateTime fechaFinActual = DateTime.Today.AddHours(hora).AddMinutes(minuto);
                     colores[button.Id][corte.Id] = CalculateColor(HoraIni, fechaFinActual);
-                    if (colores[button.Id][corte.Id] == "red")
-                    {
-                        corte.Texto = "X";
-                    }
+
                 }
             }
         }
     }
 
-    private void CorteEnviado(int buttonId, int corteId)
+    private void CorteEnviado()
     {
-        var corte = buttons.First(b => b.Id == buttonId).Cortes.First(c => c.Id == corteId);
-
-        if (corte.HoraFin < HoraIni)
-            return;
-
-        colores[buttonId][corteId] = "green";
-        botonPresionado[buttonId][corteId] = true;
+        foreach (var button in buttons)
+        {
+            if (button.Titulo == @ImageDataService.Archivo)
+            {
+                foreach (var corte in button.Cortes)
+                {
+                    if (corte.Texto == @ImageDataService.Corte)
+                    {
+                        colores[button.Id][corte.Id] = "green";
+                    }
+                }
+            }
+        }
     }
 
     private string CalculateColor(DateTime start, DateTime end)
@@ -203,7 +216,30 @@
     {
         timer?.Dispose();
     }
-
+    private async Task LoadColorsFromLocalStorage()
+    {
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                var color = await JS.InvokeAsync<string>("localStorage.getItem", $"color_{button.Id}_{corte.Id}");
+                if (!string.IsNullOrEmpty(color))
+                {
+                    colores[button.Id][corte.Id] = color;
+                }
+            }
+        }
+    }
+    private async Task SaveColorsToLocalStorage()
+    {
+        foreach (var button in buttons)
+        {
+            foreach (var corte in button.Cortes)
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", $"color_{button.Id}_{corte.Id}", colores[button.Id][corte.Id]);
+            }
+        }
+    }
     private class ButtonGroup
     {
         public int Id { get; set; }

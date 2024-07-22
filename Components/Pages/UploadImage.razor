@@ -28,12 +28,15 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
     <InputFile class="form-control mb-4" OnChange="@SetFile" multiple />
-    <button class="btn btn-primary" @onclick="EnviarDatos" type="submit">Confirmar</button>
+    <button class="btn btn-primary" type="submit">Confirmar</button>
 </EditForm>
 
 
 @if (imageUploaded)
 {
+    <p>Palabras: @succesfulWords</p>
+    <p>Dia: @succesfulDate</p>
+    <p>Tiempo: @successfulTime</p>
     <MessageValidation SuccesfulWords="@succesfulWords" CompareDate="@succesfulDate" CompareTime="@successfulTime" />
     @if (elementsToStore.Count > 0)
     {
@@ -116,15 +119,15 @@
     private List<string> analysisResult = new List<string>();
     private List<string> elementsToStore = new List<string>();
     private int succesfulWords = 4;
-    private bool succesfulDate = true;
+    private bool succesfulDate = false;
     private bool successfulTime = false;
     private string extractedDate;
     private int iii = 0;
-    private bool imageUploaded = true;
+    private bool imageUploaded = false;
     private int indice = 0;
     private ImageDTO imagedto = new ImageDTO();
     DateTime horaActual = DateTime.Now;
-    string corte = "1";
+
     public event Action<string, string> OnDataSent;
 
     // Modelo para almacenar los horarios configurables
@@ -141,30 +144,29 @@
         try
         {
             //Reiniciar estado del sistema para cargar mas de una imagen
-            imageUploaded = false;
+            imageUploaded = true;
             succesfulWords = 0;
             analysisResult.Clear();
             elementsToStore.Clear();
 
-            //string safeFileName = WebUtility.HtmlEncode(Ticket.Attachment.Name);
+            string safeFileName = WebUtility.HtmlEncode(Ticket.Attachment.Name);
 
             // Save file locally
-            //var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
-            //await using FileStream fs = new(path, FileMode.Create);
-            //await Ticket.Attachment.OpenReadStream(maxFileSize).CopyToAsync(fs);
-            //long fileSize = fs.Length;
-            //Console.WriteLine(fileSize);
-            //fs.Position = 0;
-            //AnalyzeImage(fs);
-            //CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
-            //CompareWithSystemDate();
+            var path = Path.Combine(env.ContentRootPath, "images", safeFileName);
+            await using FileStream fs = new(path, FileMode.Create);
+            await Ticket.Attachment.OpenReadStream(maxFileSize).CopyToAsync(fs);
+            long fileSize = fs.Length;
+            Console.WriteLine(fileSize);
+            fs.Position = 0;
+            AnalyzeImage(fs);
+            CompareWithFixedData(["confirmado", "satisfactoriamente", "registrado", "exitosamente"]);
+            CompareWithSystemDate();
             handleSCI();
-            imageUploaded = true;
-            //fs.Close();
-            //File.Delete(path);
+            fs.Close();
+            File.Delete(path);
             indice++; //borrar pq es de la fecha de prueba
-            imagedto.archivo = "SPI3"; // Reemplaza con el valor real obtenido
-            imagedto.corte = "1"; // Reemplaza con el valor real obtenido
+                      //imagedto.archivo = "SPI3"; // Reemplaza con el valor real obtenido
+                      // imagedto.corte = "1"; // Reemplaza con el valor real obtenido
 
             ImageDataService.SetImageData(imagedto.archivo, imagedto.corte);
 
@@ -245,16 +247,17 @@
             comparisonResults.Add(fixedData[i] == analysisResult[i]);
             succesfulWords++;
         }
+        Console.WriteLine(succesfulWords);
     }
 
     private bool CompareWithSystemDate()
     {
-        
-        //string imageDate = "12/07/2024"; //imagedto.fecha; //"07/10/2024"
-        string[] numeros = new string[] { "12/07/2024", "13/07/2024" };
+
+        string imageDate = "22/07/2024"; //imagedto.fecha; //"07/10/2024"
+                                         //string[] numeros = new string[] { "12/07/2024", "13/07/2024" };
 
         Console.WriteLine(imagedto.fecha);
-        if (DateTime.TryParseExact(numeros[indice], "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
+        if (DateTime.TryParseExact(imageDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime extractedDate))
         {
             DateTime systemDate = DateTime.Now.Date;
             succesfulDate = extractedDate == systemDate;
@@ -391,10 +394,12 @@
 
         (TimeSpan inicio, TimeSpan fin) horarios;
 
-        switch ("SCI1")
+        string corte = imagedto.corte;
+        switch (imagedto.archivo)
         {
             case "SPI1":
                 horarios = horariosSPI1[corte];
+
                 break;
             case "SPI3":
                 horarios = horariosSPI3[corte];
@@ -409,7 +414,9 @@
                 throw new ArgumentException("Invalid 'archivo' value");
         }
 
-        bool successfulTime = compareTime(horarios);
+        successfulTime = compareTime(horarios);
+        Console.WriteLine(horarios);
+        Console.WriteLine(successfulTime);
 
         return successfulTime;
     }
@@ -418,6 +425,7 @@
     private bool compareTime((TimeSpan inicio, TimeSpan fin) horarios)
     {
         var now = DateTime.Now.TimeOfDay;
+        Console.WriteLine(horarios.inicio + "" + horarios.fin);
         return now >= horarios.inicio && now <= horarios.fin;
     }
 

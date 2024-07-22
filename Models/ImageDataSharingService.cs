@@ -10,7 +10,7 @@ namespace PruebaAnalisisDeImagen.Models
         public void SetImageData(string archivo, string corte)
         {
             Archivo = archivo;
-            Corte = corte;
+            Corte = "Corte "+corte;
         }
 
         public (string archivo, string corte) GetImageData()

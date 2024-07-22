@@ -1,4 +1,5 @@
-﻿@if (SuccesfulWords < 4)
+﻿
+@if (SuccesfulWords < 4)
 {
     <div>
         <h3 class="text-danger"> Falta el mensaje de confirmación de carga exitosa {@SuccesfulWords}</h3>
@@ -22,10 +23,7 @@ else if (SuccesfulWords == 4 && CompareDate && CompareTime)
     <h3 class="text-success"> Validado exitosamente</h3>
 </div>
 }
-else
-{
-    <h3 class="text-danger">Lasasasasasasas la fecha actual @SuccesfulWords @CompareDate </h3>
-}
+
 
 
 @code {
